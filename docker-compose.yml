@@ -1,0 +1,107 @@
+services:
+  wechat-selkies:
+    image: ${WECHAT_SELKIES_IMAGE:-ghcr.io/nickrunning/wechat-selkies:0.0.12-minimal}
+    platform: ${WECHAT_SELKIES_PLATFORM:-}
+    container_name: wechat-selkies
+    restart: unless-stopped
+    profiles: ["core"]
+    cap_add:
+      - SYS_PTRACE
+    security_opt:
+      - seccomp=unconfined
+    shm_size: "${SHM_SIZE:-1gb}"
+    ports:
+      - "${HTTP_BIND:-127.0.0.1}:${HTTP_PORT:-3000}:3000"
+      - "${HTTPS_BIND:-127.0.0.1}:${HTTPS_PORT:-3001}:3001"
+    volumes:
+      - ./config:/config
+      - ./tools/wechat-decrypt:/opt/wechat-decrypt:ro
+      - ./agent_console:/opt/wechat-controller:ro
+      - ./runtime/wechat-decrypt:/runtime/wechat-decrypt
+    environment:
+      - PUID=${PUID:-1000}
+      - PGID=${PGID:-100}
+      - TZ=${TZ:-Asia/Shanghai}
+      - LC_ALL=${LC_ALL:-zh_CN.UTF-8}
+      - AUTO_START_WECHAT=${AUTO_START_WECHAT:-true}
+      - AUTO_START_QQ=${AUTO_START_QQ:-false}
+      - CUSTOM_USER=${CUSTOM_USER:-}
+      - PASSWORD=${PASSWORD}
+
+  wechat-memory-sync:
+    image: ${WECHAT_AGENT_IMAGE:-docker.io/xiaoguiwucan/linux-wechat-agent:latest}
+    container_name: wechat-memory-sync
+    restart: unless-stopped
+    profiles: ["core"]
+    depends_on:
+      - wechat-selkies
+    volumes:
+      - ./config:/app/config:ro
+      - ./runtime:/app/runtime
+    command:
+      - python
+      - memory/sync_worker.py
+      - --interval
+      - "${MEMORY_SYNC_INTERVAL:-5}"
+      - --source-db-dir
+      - /app/config/xwechat_files/${WECHAT_ACCOUNT_DIR_NAME:-PLEASE_SET_WECHAT_ACCOUNT_DIR}/db_storage
+      - --decrypted-dir
+      - /app/runtime/wechat-decrypt/decrypted
+      - --keys-file
+      - /app/runtime/wechat-decrypt/keys/all_keys.json
+      - --decrypt-state-file
+      - /app/runtime/wechat-decrypt/sync_state.json
+      - --memory-db
+      - /app/runtime/memory/wechat_memory.sqlite
+      - --status-file
+      - /app/runtime/memory/sync_status.json
+      - --wechat-base-dir
+      - /app/config/xwechat_files/${WECHAT_ACCOUNT_DIR_NAME:-PLEASE_SET_WECHAT_ACCOUNT_DIR}
+      - --runtime-dir
+      - /app/runtime
+      - --media-dir
+      - /app/runtime/media
+      - --config-file
+      - /app/runtime/wechat-decrypt/config.json
+
+  wechat-nas-agent:
+    image: python:3.12-alpine
+    container_name: wechat-nas-agent
+    restart: unless-stopped
+    profiles: ["archive"]
+    depends_on:
+      - wechat-memory-sync
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+      - MEMORY_DB=/app/runtime/memory/wechat_memory.sqlite
+      - ARCHIVE_DB=/app/runtime/nas-agent/archive.sqlite
+      - WECHAT_BASE_DIR=/app/config/xwechat_files/${WECHAT_ACCOUNT_DIR_NAME:-PLEASE_SET_WECHAT_ACCOUNT_DIR}
+      - WECHAT_SELF_USERNAME=${WECHAT_SELF_USERNAME}
+      - ARCHIVE_ROOT=/archive
+      - POLL_SECONDS=${NAS_AGENT_INTERVAL:-3}
+    volumes:
+      - ./nas-agent:/opt/nas-agent:ro
+      - ./config:/app/config:ro
+      - ./runtime:/app/runtime
+      - ${NAS_ARCHIVE_DIR}:/archive
+    command: ["python", "/opt/nas-agent/nas_agent.py"]
+
+  wechat-reply-worker:
+    image: python:3.12-alpine
+    container_name: wechat-reply-worker
+    restart: unless-stopped
+    profiles: ["reply"]
+    depends_on:
+      - wechat-selkies
+      - wechat-nas-agent
+    environment:
+      - TZ=${TZ:-Asia/Shanghai}
+      - ARCHIVE_DB=/app/runtime/nas-agent/archive.sqlite
+      - WECHAT_CONTAINER=wechat-selkies
+      - POLL_SECONDS=${REPLY_WORKER_INTERVAL:-3}
+      - ALLOWED_CHAT_USERNAMES=${ALLOWED_CHAT_USERNAMES}
+    volumes:
+      - ./nas-agent:/opt/nas-agent:ro
+      - ./runtime:/app/runtime
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: ["python", "/opt/nas-agent/reply_worker.py"]

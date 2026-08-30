@@ -1,0 +1,12 @@
+# Local deployment configuration and private WeChat data
+.env
+config/
+runtime/
+backups/
+
+# Local editor and Codex state
+.codex/
+.agents/
+
+# Independently cloned upstream source; do not vendor it here
+upstream/
