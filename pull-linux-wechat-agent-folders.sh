@@ -6,8 +6,8 @@ REPOSITORY_URL="https://github.com/xiaoguiwucan/linux-wechat-agent.git"
 TARGET_DIR="${1:-.}"
 FOLDERS=(agent_console ai design_mockups docs memory scripts status tools web)
 PROJECT_REPOSITORY_URL="https://github.com/flyswing/wechat-nas.git"
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-SCRIPT_PATH="$PROJECT_DIR/scripts/$(basename "${BASH_SOURCE[0]}")"
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SCRIPT_PATH="$PROJECT_DIR/$(basename "${BASH_SOURCE[0]}")"
 
 # Force tracked project files to exactly match GitHub main. Ignored runtime
 # data (such as .env and config/) remains untouched; tracked local work is
