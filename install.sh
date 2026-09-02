@@ -6,8 +6,7 @@ REPOSITORY_URL="https://github.com/xiaoguiwucan/linux-wechat-agent.git"
 TARGET_DIR="${1:-.}"
 FOLDERS=(agent_console ai design_mockups docs memory scripts status tools web)
 PROJECT_REPOSITORY_URL="https://github.com/flyswing/wechat-nas.git"
-PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SCRIPT_PATH="$PROJECT_DIR/$(basename "${BASH_SOURCE[0]}")"
+PROJECT_DIR="$(pwd)"
 
 # Force tracked project files to exactly match GitHub main. Ignored runtime
 # data (such as .env and config/) remains untouched; tracked local work is
@@ -19,8 +18,6 @@ git -C "$PROJECT_DIR" reset --hard FETCH_HEAD
 TEMP_DIR="$(mktemp -d)"
 trap 'rm -rf "$TEMP_DIR"' EXIT
 CHECKOUT_DIR="$TEMP_DIR/linux-wechat-agent"
-SCRIPT_BACKUP="$TEMP_DIR/$(basename "$SCRIPT_PATH")"
-cp "$SCRIPT_PATH" "$SCRIPT_BACKUP"
 
 git clone --depth 1 --filter=blob:none --no-checkout "$REPOSITORY_URL" "$CHECKOUT_DIR"
 
@@ -39,11 +36,6 @@ for folder in "${FOLDERS[@]}"; do
   rm -rf "$target_dir"
   mv "$source_dir" "$target_dir"
 done
-
-# The upstream scripts directory replaces this one, so restore the updater.
-mkdir -p "$(dirname "$SCRIPT_PATH")"
-cp "$SCRIPT_BACKUP" "$SCRIPT_PATH"
-chmod +x "$SCRIPT_PATH"
 
 echo "Force-updated project and replaced upstream folders in: $TARGET_DIR"
 echo "Root-level upstream repository files were intentionally not copied."
