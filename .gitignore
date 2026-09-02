@@ -1,6 +1,7 @@
 # Local deployment configuration and private WeChat data
 .env
-config/
+config/*
+!config/.gitkeep
 runtime/
 backups/
 

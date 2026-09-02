@@ -76,7 +76,6 @@ services:
       - MEMORY_DB=/app/runtime/memory/wechat_memory.sqlite
       - ARCHIVE_DB=/app/runtime/nas-agent/archive.sqlite
       - WECHAT_BASE_DIR=/app/config/xwechat_files/${WECHAT_ACCOUNT_DIR_NAME:-PLEASE_SET_WECHAT_ACCOUNT_DIR}
-      - WECHAT_SELF_USERNAME=${WECHAT_SELF_USERNAME}
       - ARCHIVE_ROOT=/archive
       - POLL_SECONDS=${NAS_AGENT_INTERVAL:-3}
     volumes:

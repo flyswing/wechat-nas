@@ -16,7 +16,8 @@ MEMORY_DB = Path(os.getenv("MEMORY_DB", "/app/runtime/memory/wechat_memory.sqlit
 STATE_DB = Path(os.getenv("ARCHIVE_DB", "/app/runtime/nas-agent/archive.sqlite"))
 WECHAT_BASE_DIR = Path(os.getenv("WECHAT_BASE_DIR", "/app/config/xwechat_files"))
 ARCHIVE_ROOT = Path(os.getenv("ARCHIVE_ROOT", "/archive"))
-SELF_USERNAME = os.getenv("WECHAT_SELF_USERNAME", "").strip()
+ACCOUNT_DIR_NAME = os.getenv("WECHAT_ACCOUNT_DIR_NAME", "").strip()
+SELF_USERNAME = ACCOUNT_DIR_NAME.rsplit("_", 1)[0] if "_" in ACCOUNT_DIR_NAME else ACCOUNT_DIR_NAME
 POLL_SECONDS = float(os.getenv("POLL_SECONDS", "3"))
 
 
@@ -118,13 +119,16 @@ def archive_message(state: sqlite3.Connection, row: sqlite3.Row) -> bool:
     if not source:
         return False
 
-    chat_name = safe_component(row["chat_display_name"] or row["chat_username"], row["chat_username"])
-    month = message_month(row["create_time"])
-    destination_dir = ARCHIVE_ROOT / chat_name / month
-    destination_dir.mkdir(parents=True, exist_ok=True)
-    destination = destination_dir / file_name
-
+    # All received files live directly under the configured archive root.
+    # A content suffix prevents different files with the same name from
+    # overwriting one another in that shared directory.
+    ARCHIVE_ROOT.mkdir(parents=True, exist_ok=True)
     source_hash = sha256(source)
+    destination = ARCHIVE_ROOT / file_name
+    if destination.exists() and sha256(destination) != source_hash:
+        original = Path(file_name)
+        destination = ARCHIVE_ROOT / f"{original.stem}__{source_hash[:12]}{original.suffix}"
+
     if destination.exists() and sha256(destination) == source_hash:
         destination_hash = source_hash
     else:
@@ -161,8 +165,8 @@ def archive_message(state: sqlite3.Connection, row: sqlite3.Row) -> bool:
 
 
 def main() -> None:
-    if not SELF_USERNAME:
-        raise RuntimeError("必须设置 WECHAT_SELF_USERNAME")
+    if not ACCOUNT_DIR_NAME:
+        raise RuntimeError("必须设置 WECHAT_ACCOUNT_DIR_NAME")
 
     STATE_DB.parent.mkdir(parents=True, exist_ok=True)
     state = sqlite3.connect(STATE_DB, timeout=30)
